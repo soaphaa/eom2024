@@ -40,14 +40,15 @@ int lastButtonReleaseTime; //to calculate the gap between buttonPresses
 unsigned long lastDebounceTime = 0; // Time of the last debounce event
 
 String inputStr = "";
-String morseSeq = "";
-String keyStr = ""; //stores the translation from morse to english
+String morseOutput = "";
+
+String morseInput = "";
+String keyOutput = ""; //stores the translation from morse to english
 char ch;
 
-bool togglePressed, buttonPressed, newLetter, newWord, letterFound, morseFound, morseDetected, wordsDetected;
+bool startScreen, togglePressed, buttonPressed, newLetter, newWord, letterFound, morseFound, morseDetected, wordsDetected;
 
 
-const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; // alphabet
 char* morseDict[] = {".-", "-...", "-.-.", "-..", ".", "..-.", "--.", "....", "..", 
                     ".---", "-.-", ".-..", "--", "-.", "---", ".--.", "--.-", ".-.",
                      "...", "-", "..-", "...-", ".--", "-..-", "-.--", "--.."}; 
@@ -66,6 +67,7 @@ void setup() {
   buttonPressed = false;
   morseDetected = false;
   wordsDetected = false;
+  startScreen = true;
 
    // Print a message to the LCD to ensure it functions
   pinMode(buttonPin, INPUT);
@@ -143,7 +145,14 @@ void loop() {
       analogWrite(RED, 255);
       analogWrite(GREEN, 0);
       analogWrite(BLUE, 0);
-      readMorse(); // Call readMorse method
+      if(startScreen){
+        lcd.setCursor(0,0);
+        lcd.print("mode 1: Type");
+        lcd.setCursor(0,1);
+        lcd.print("on the screen");
+      }
+      startScreen = false;
+      readMonitor(); // Call readMonitor method
       break;
 
     case 1:  // Mode 1: Write Morse
@@ -207,69 +216,65 @@ void loop() {
 // }
 
 
-// void playGame(int n){
-//     switch(pos){
-//       case 0:
-//       digitalWrite(rPin, HIGH);
-//       digitalWrite(gPin, LOW);
-//       digitalWrite(bPin, LOW);
-     
-//       readMorse();
-//       lcd.clear();
-//       lcd.print("Mode: Read morse");
-     
-//       break;
-
-
-//       case 1:
-
-//       digitalWrite(rPin, LOW);
-//       digitalWrite(gPin, HIGH);
-//       digitalWrite(bPin, LOW);
-
-//       writeMorse();
-//       lcd.clear();
-//       lcd.print("Mode: Write morse");
-
-
-//       break;
-
-
-//       case 2:
-
-//       digitalWrite(rPin, LOW);
-//       digitalWrite(gPin, LOW);
-//       digitalWrite(bPin, HIGH);
-//       minigame();
-//       lcd.clear();
-//       lcd.print("Mode: minigame");
-
-
-//       break;
-
-
-//       case 4:
-//       messages();
-//       lcd.clear();
-//       lcd.print("Mode: messages..");
-
-
-//       break;
-
-
-//       default:
-//       break;
-
-
-//     }
-// }
-
-
-void readMorse() {
-  Serial.println("reading morse");
+void readMonitor() {
   //reset the other method values
-  morseSeq = ""; 
-  keyStr = "";
+  morseInput = ""; 
+  keyOutput = "";
+
+  serialEvent();
+  //Serial.print(inputStr);
+  if(inputStr != ""){
+      int len = inputStr.length();
+      inputStr.toUpperCase(); //turn the string into uppercase so it's comparable to the alphabet
+      
+      // Convert input to Morse code
+      for (int i = 0; i < len; i++) {
+        Serial.println("round: " + i);
+        for(int j = 0; j < 26; j++){
+          if(inputStr[i] == alpha[j]){
+            Serial.print("found ");
+            Serial.print(alpha[j]);
+            morseOutput+= morseDict[j];
+            morseOutput+=" ";
+            Serial.println(morseOutput);            
+            morseFound = true;
+            break;
+          }
+        }
+      }
+    Serial.println(inputStr);
+    Serial.println(morseOutput);
+    lcd.setCursor(0,0);
+    lcd.print(inputStr);
+    lcd.setCursor(0,1);
+    lcd.print(morseOutput);
+    delay(1000);
+    for(int k = 0; k<morseOutput.length(); k++){
+      if(morseOutput[k] == '.'){
+        digitalWrite(ledPin, HIGH);
+        digitalWrite(buzzerPin, HIGH);
+        delay(ditLength);
+        digitalWrite(ledPin, LOW);
+        digitalWrite(buzzerPin, LOW);
+        delay(ditLength);
+      }
+      else if(morseOutput[k] == '-'){
+        digitalWrite(ledPin, HIGH);
+        digitalWrite(buzzerPin, HIGH);
+        delay(dahLength);
+        digitalWrite(ledPin, LOW);
+        digitalWrite(buzzerPin, LOW);
+        delay(ditLength);
+      }
+      else{
+        digitalWrite(ledPin, LOW);
+        digitalWrite(buzzerPin, LOW);
+        delay(ditLength);
+      }
+    }
+    inputStr = "";
+  } 
+  // }
   // serialEvent();
   // inputStr = "sOs";
   // Serial.println(inputStr);
@@ -282,24 +287,6 @@ void readMorse() {
   //   lcd.clear();
   //   lcd.setCursor(0, 0);
   //   lcd.print("Enter on the monitor:");
-
-
-  //   // Convert inputStr to char array
-  //   int len = inputStr.length();
-  //   char arrayChar[len + 1];
-  //   inputStr.toCharArray(arrayChar, len + 1);
-
-
-  //   // Convert input to Morse code
-  //   for (int i = 0; i < len; i++) {
-  //     char currentChar = toupper(arrayChar[i]); // ignore lower or uppercase
-  //     for (int j = 0; j < sizeof(alphabet) - 1; j++) {
-  //       if (currentChar == alphabet[j]) {
-  //         morseTrans += morseDict[j] + " "; // Add Morse code with space separator
-  //         break;
-  //       }
-  //     }
-  //   }
 
 
   //   // Display the Morse code
@@ -316,17 +303,19 @@ void readMorse() {
 
 
 void serialEvent() {
-  // while (Serial.available()) {
-  //   char inChar = (char)Serial.read();
-  //   if (inChar == '\n') {
-  //     strComplete = true;
-  //   } else {
-  //     inputStr += inChar;
-  //   }
-  // }
+  while (Serial.available()) {
+    char inChar = (char)Serial.read();
+    inputStr = inputStr + inChar;
+  }
+}
+
+void checkTranslation(char a){
+  
 }
 
 void writeMorse() {
+  inputStr = "";
+  morseOutput = "";
   int morseButtonReading = digitalRead(buttonPin); // Read the Morse input button state
 
   // Handle debounce logic for the Morse input button
@@ -350,13 +339,13 @@ void writeMorse() {
 
       // Determine if DOT or DASH
       if (pressDuration < ditLength * 1.5) {
-        morseSeq += ".";  
+        morseInput += ".";  
       } else {
-        morseSeq += "-"; 
+        morseInput += "-"; 
       }
 
       lcd.setCursor(0,1);
-      lcd.print(morseSeq);
+      lcd.print(morseInput);
 
       // Update last button release time
       lastButtonReleaseTime = millis();
@@ -375,8 +364,8 @@ void writeMorse() {
 
       // Compare the Morse sequence to the dictionary
       for (int i = 0; i < 26; i++) {
-        if (morseSeq == morseDict[i]) {
-          keyStr += alpha[i]; // Add the letter to the translated string
+        if (morseInput == morseDict[i]) {
+          keyOutput += alpha[i]; // Add the letter to the translated string
           letterFound = true;
           break; // Stop searching once a match is found
         }
@@ -390,20 +379,21 @@ void writeMorse() {
       }
 
       // Reset the Morse sequence
-      morseSeq = ""; // Clear the current Morse sequence
+      morseInput = ""; // Clear the current Morse sequence
       newLetter = false;
 
       // Update the LCD with the current translation
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print(keyStr); // Print the translated text
+      lcd.print(keyOutput); // Print the translated text
     }
   }
 
   // Debugging: Print the current Morse sequence
   Serial.print("Morse Sequence: ");
-  Serial.println(morseSeq);
+  Serial.println(morseInput);
 }
+
 
 
 
@@ -437,8 +427,11 @@ void minigame() {
   lcd.clear();
   lcd.setCursor(0, 0);
   //reset the other method values
-  morseSeq = ""; 
-  keyStr = "";
+  morseInput = ""; 
+  keyOutput = "";
+  inputStr = "";
+  morseOutput = "";
+
   lcd.print("Playing MiniGame...");
   Serial.print("minigame mode");
 }
